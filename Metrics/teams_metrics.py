@@ -12,9 +12,10 @@ class TeamsMetrics:
         self._load_all_jsons()
 
     def _load_all_jsons(self):
-        for filename in os.listdir(self.root_folder):
+    for root, _, files in os.walk(self.root_folder):  # <== changed from os.listdir to os.walk
+        for filename in files:
             if filename.endswith(".json"):
-                with open(os.path.join(self.root_folder, filename), "r", encoding="utf-8") as f:
+                with open(os.path.join(root, filename), "r", encoding="utf-8") as f:
                     for msg in json.load(f):
                         sender = (msg.get("chat_from") or "").strip()
                         timestamp = msg.get("timestamp", "")
@@ -28,6 +29,7 @@ class TeamsMetrics:
                             "message": msg.get("message", ""),
                             "channel": msg.get("channel", "")
                         })
+
 
     def compute_metrics(self):
         return {
