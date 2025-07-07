@@ -4,7 +4,6 @@ from collections import defaultdict
 from datetime import datetime
 import numpy as np
 from statistics import median
-from datetime import datetime
 
 class TeamsMetrics:
     def __init__(self, root_folder):
@@ -15,44 +14,30 @@ class TeamsMetrics:
     def _load_all_jsons(self):
         for filename in os.listdir(self.root_folder):
             if filename.endswith(".json"):
-                filepath = os.path.join(self.root_folder, filename)
-                with open(filepath, "r", encoding="utf-8") as f:
-                    messages = json.load(f)
-
-                for msg in messages:
-                    sender = (msg.get("chat_from", "") if msg.get("chat_from", "") is not None else "").strip()
-                    timestamp = msg.get("timestamp", "")
-                    channel = msg.get("channel", "")
-                    message = msg.get("message", "")
-
-                    if not sender or not timestamp:
-                        continue
-
-                    try:
-                        date = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).date().isoformat()
-                    except Exception:
-                        continue
-
-                    self.data[sender][date].append({
-                        "message": message,
-                        "channel": channel
-                    })
+                with open(os.path.join(self.root_folder, filename), "r", encoding="utf-8") as f:
+                    for msg in json.load(f):
+                        sender = (msg.get("chat_from") or "").strip()
+                        timestamp = msg.get("timestamp", "")
+                        if not sender or not timestamp:
+                            continue
+                        try:
+                            date = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).date().isoformat()
+                        except Exception:
+                            continue
+                        self.data[sender][date].append({
+                            "message": msg.get("message", ""),
+                            "channel": msg.get("channel", "")
+                        })
 
     def compute_metrics(self):
-        results = defaultdict(dict)
-
-        for user, daily_messages in self.data.items():
-            for date, messages in daily_messages.items():
-                T_d = len(messages)
-
-                # Median length of messages
-                lengths = [len(m["message"]) for m in messages if m.get("message")]
-                ML_d = median(lengths) if lengths else 0
-
-                # Total unique channels
-                channels = {m["channel"] for m in messages if m.get("channel")}
-                TC_d = len(channels)
-
-                results[user][date] = np.array([T_d, round(ML_d, 2), round(TC_d, 2)])
-
-        return results
+        return {
+            user: {
+                date: np.array([
+                    len(msgs),
+                    round(median([len(m["message"]) for m in msgs if m["message"]]) if msgs else 0, 2),
+                    round(len({m["channel"] for m in msgs if m["channel"]}), 2)
+                ])
+                for date, msgs in daily_msgs.items()
+            }
+            for user, daily_msgs in self.data.items()
+        }
